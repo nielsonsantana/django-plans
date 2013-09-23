@@ -313,7 +313,7 @@ class PlanQuota(models.Model):
         verbose_name = _("Plan quota")
         verbose_name_plural = _("Plans quotas")
 
-class Order(models.Model):
+class Orders(models.Model):
     STATUS=Enumeration([
         (1, 'NEW', pgettext_lazy(u'Order status', u'new')),
         (2, 'COMPLETED', pgettext_lazy(u'Order status', u'completed')),
@@ -334,6 +334,13 @@ class Order(models.Model):
         blank=True) # Tax=None is when tax is not applicable
     currency = models.CharField(_('currency'), max_length=3, default='EUR')
     status = models.IntegerField(_('status'), choices=STATUS, default=STATUS.NEW)
+    order_id = models.CharField(max_length=40, null=True, blank=True, unique=True)
+
+    def __init__(self, *args, **kwargs):
+        import uuid
+        super(Order, self).__init__(*args,**kwargs)
+        if not self.order_id:
+            self.order_id = str(uuid.uuid4().hex[:-16])
 
     def save(self, force_insert=False, force_update=False, using=None):
         if self.created is None:

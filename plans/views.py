@@ -290,27 +290,27 @@ class CreateOrderPlanChangeView(CreateOrderView):
 class OrderView(DetailView):
     model = Order
 
-#    def get_context_data(self, **kwargs):
-#        context = super(OrderView, self).get_context_data(**kwargs)
-#
-#        self.CURRENCY = getattr(settings, 'CURRENCY', None)
-#        if len( self.CURRENCY) != 3:
-#            raise ImproperlyConfigured('CURRENCY should be configured as 3-letter currency code.')
-#        context['CURRENCY'] = self.CURRENCY
-#
-#        context['plan'] = self.object.plan
-#        context['pricing'] = self.object.pricing
-#        context['tax'] = self.object.tax
-#        context['amount'] = self.object.amount
-#        context['tax_total'] = self.object.total() - self.object.amount
-#        context['total'] = self.object.total()
-#
-#        context['invoices_proforma'] = self.object.get_invoices_proforma()
-#        context['invoices'] = self.object.get_invoices()
-#
-#        context['printable_documents'] = self.object.get_all_invoices()
-#        context['INVOICE_TYPES'] = Invoice.INVOICE_TYPES
-#        return context
+    def get_context_data(self, **kwargs):
+        context = super(OrderView, self).get_context_data(**kwargs)
+
+        self.CURRENCY = getattr(settings, 'CURRENCY', None)
+        if len( self.CURRENCY) != 3:
+           raise ImproperlyConfigured('CURRENCY should be configured as 3-letter currency code.')
+        context['CURRENCY'] = self.CURRENCY
+
+        context['plan'] = self.object.plan
+        context['pricing'] = self.object.pricing
+        context['tax'] = self.object.tax
+        context['amount'] = self.object.amount
+        context['tax_total'] = self.object.total() - self.object.amount
+        context['total'] = self.object.total()
+
+        context['invoices_proforma'] = self.object.get_invoices_proforma()
+        context['invoices'] = self.object.get_invoices()
+
+        context['printable_documents'] = self.object.get_all_invoices()
+        context['INVOICE_TYPES'] = Invoice.INVOICE_TYPES
+        return context
 
     def get_queryset(self):
         return super(OrderView, self).get_queryset().filter(user=self.request.user).select_related('plan', 'pricing', )

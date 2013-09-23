@@ -102,9 +102,9 @@ class InvoiceInline(admin.TabularInline):
 class OrderAdmin(admin.ModelAdmin):
     list_filter = ('status', 'created', 'completed', 'plan__name', 'pricing')
     raw_id_fields = ('user',)
-    search_fields = ('id', 'user__username', 'user__email')
+    search_fields = ('id', 'user__username', 'user__email','order_id')
     list_display = (
-    'id', 'name', 'created', 'user', 'status', 'completed', 'tax', 'amount', 'currency', 'plan', 'pricing')
+    'id', 'name', 'created', 'user', 'status', 'completed', 'tax', 'amount', 'currency', 'plan', 'pricing','order_id')
     actions = [make_order_completed, make_order_invoice]
     inlines = (InvoiceInline, )
 
