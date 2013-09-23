@@ -313,7 +313,7 @@ class PlanQuota(models.Model):
         verbose_name = _("Plan quota")
         verbose_name_plural = _("Plans quotas")
 
-class Orders(models.Model):
+class Order(models.Model):
     STATUS=Enumeration([
         (1, 'NEW', pgettext_lazy(u'Order status', u'new')),
         (2, 'COMPLETED', pgettext_lazy(u'Order status', u'completed')),
