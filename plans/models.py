@@ -48,6 +48,9 @@ class Plan(OrderedModel):
         super(Plan, self).save(*args, **kwargs)
 
 
+    def __unicode__(self):
+        return u"%s" % (self.name)
+
     @classmethod
     def get_default_plan(cls):
         try:
@@ -55,8 +58,12 @@ class Plan(OrderedModel):
         except IndexError:
             return None
 
-    def __unicode__(self):
-        return u"%s" % (self.name)
+
+    def get_quota_by_name(self, quota_name):
+        try:
+            return self.planquota_set.filter(quota__codename=quota_name)[0]
+        except IndexError, e:
+            return None
 
 
 class BillingInfo(models.Model):
@@ -256,9 +263,6 @@ class Pricing(models.Model):
 
     def __unicode__(self):
         return u"%s (%d "  % (self.name, self.period) + unicode(_("days")) + u")"
-
-
-
 
 class Quota(OrderedModel):
     codename = models.CharField(_('codename'), max_length=50, unique=True, db_index=True)
