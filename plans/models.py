@@ -2,7 +2,7 @@ from decimal import Decimal
 from django.contrib.sites.models import Site
 from django.db.models import Max
 from django.utils import translation
-from django_countries import CountryField
+from django_countries.fields import CountryField
 from pytz import utc
 import re
 from django.core.urlresolvers import reverse
