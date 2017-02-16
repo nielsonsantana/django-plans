@@ -1,28 +1,58 @@
 django-plans changelog
 ======================
 
-current dev
------------
+0.7
+---
+* Changes in plans.taxation.eu.EUTaxationPolicy to implement new EU VAT regulations (MOSS)
+* Clean up settings variables naming conventions prepending PLANS_ prefix:
+  * Renamed settings variable name TAXATION_POLICY to PLANS_TAXATION_POLICY
+  * Renamed settings variable name ISSUER_DATA to PLANS_INVOICE_ISSUER
+  * Renamed settings variable name PLAN_EXPIRATION_REMIND to PLANS_EXPIRATION_REMIND
+  * Renamed settings variable name PLAN_CHANGE_POLICY to PLANS_CHANGE_POLICY
+  * Renamed settings variable name PLAN_VALIDATORS to PLANS_VALIDATORS
+  * Renamed settings variable name CURRENCY to PLANS_CURRENCY
+  * Renamed settings variable name TAX to PLANS_TAX
+  * Renamed settings variable name TAX_COUNTRY to PLANS_TAX_COUNTRY
+  * Renamed settings variable name INVOICE_LOGO_URL to PLANS_INVOICE_LOGO_URL
+  * Renamed settings variable name INVOICE_NUMBER_FORMAT to PLANS_INVOICE_NUMBER_FORMAT
+  * Renamed settings variable name INVOICE_TEMPLATE to PLANS_INVOICE_TEMPLATE
+  * Renamed settings variable name INVOICE_COUNTER_RESET to PLANS_INVOICE_COUNTER_RESET
+  * Renamed settings variable name ORDER_EXPIRATION to PLANS_ORDER_EXPIRATION
+  * Renamed settings variable name PLAN_DEFAULT_GRACE_PERIOD to PLANS_DEFAULT_GRACE_PERIOD
+
+
+
+0.6+
+----
 * Changing `QuotaValidator` API. `ModelCountValidator` requires now to give `add` argument only as a kwarg.
 * Adding support for defining URL for plan, quota and pricing period that will act as a clickable pricing
   table header (requires schema migration)
+* Rename settings variable PLAN_ACTIVATION_VALIDATORS to PLAN_VALIDATORS
+* Major refactoring of Validators API providing new feature - required_to_activate False/True for validators
+* updating dependency to django-countries>=2.0 (fixes #29)
+* support for django1.6 (fixes #28)
+* complete demo application using Boostrap v3 for cool look
+* adding missing default templates
+* refactored login_required decorator usage (issue #20)
+* taxation policies are moved from locale directory (issue #13) warning: backward incompatible!
+* dependencies (apart from suds) are reviewed and refactored in setup.py (issue #9)
 
 v.0.5 - v0.6
 ------------
 
-[...] (FIXME: history changelog from git commits
+[...] (FIXME: write history changelog from git commits
 
 v.0.4
 -----
 
-* Migrating to django-countries. Requires schemamigration.
+* Migrating to django-countries. Requires schema migration.
 
 v.0.3
 -----
 
-* Change plan policy - custom action how to billing change plan (downgrage/upgrade) can be implemented
+* Change plan policy - custom action how to billing change plan (downgrade/upgrade) can be implemented
 * Taxation policy - custom action how to calculate tax can be implemented
-* Dropping south migrations, it should be managed now as a project dependend migrations via SOUTH_MIGRATION_MODULES
+* Dropping south migrations, it should be managed now as a project dependent migrations via SOUTH_MIGRATION_MODULES
 
 v. 0.1.1
 --------

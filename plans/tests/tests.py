@@ -1,20 +1,45 @@
 from decimal import Decimal
-from django.core.exceptions import ImproperlyConfigured
+from datetime import date
+from datetime import timedelta
+
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.test import TestCase
 from django.contrib.auth.models import User
 from django.conf import settings
-from datetime import date
-from datetime import timedelta
-import mock
-from plans.models import PlanPricing, Invoice, Order, Pricing, Plan
 from django.core import mail
 from django.db.models import Q
+from django.utils import six
+
+
+if six.PY2:
+    import mock
+elif six.PY3:
+    from unittest import mock
+
+from plans.models import PlanPricing, Invoice, Order, Plan
 from plans.plan_change import PlanChangePolicy, StandardPlanChangePolicy
-from plans.taxation import EUTaxationPolicy
+from plans.taxation.eu import EUTaxationPolicy
+from plans.quota import get_user_quota
+from plans.validators import ModelCountValidator
+
 
 class PlansTestCase(TestCase):
-#    fixtures = ['test_user', 'test_plan.json']
     fixtures = ['initial_plan', 'test_django-plans_auth', 'test_django-plans_plans']
+
+    def setUp(self):
+        mail.outbox = []
+
+    def test_get_user_quota(self):
+        u = User.objects.get(username='test1')
+        self.assertEqual(get_user_quota(u),
+                         {u'CUSTOM_WATERMARK': 1, u'MAX_GALLERIES_COUNT': 3, u'MAX_PHOTOS_PER_GALLERY': None})
+
+    def test_get_plan_quota(self):
+        u = User.objects.get(username='test1')
+        p = u.userplan.plan
+        self.assertEqual(p.get_quota_dict(),
+                         {u'CUSTOM_WATERMARK': 1, u'MAX_GALLERIES_COUNT': 3, u'MAX_PHOTOS_PER_GALLERY': None})
+
 
     def test_extend_account_same_plan_future(self):
         u = User.objects.get(username='test1')
@@ -24,7 +49,7 @@ class PlansTestCase(TestCase):
         plan_pricing = PlanPricing.objects.get(plan=u.userplan.plan, pricing__period=30)
         u.userplan.extend_account(plan_pricing.plan, plan_pricing.pricing)
         self.assertEqual(u.userplan.expire,
-            date.today() + timedelta(days=50) + timedelta(days=plan_pricing.pricing.period))
+                         date.today() + timedelta(days=50) + timedelta(days=plan_pricing.pricing.period))
         self.assertEqual(u.userplan.plan, plan_pricing.plan)
         self.assertEqual(u.userplan.active, True)
         self.assertEqual(len(mail.outbox), 1)
@@ -49,12 +74,10 @@ class PlansTestCase(TestCase):
         Tests if account has been activated
         """
         u = User.objects.get(username='test1')
-        print u.userplan
-        u.userplan.expire = date.today() + timedelta(days=50)
+        u.userplan.expire = date.today() - timedelta(days=50)
         u.userplan.active = False
         u.userplan.save()
         plan_pricing = PlanPricing.objects.filter(~Q(plan=u.userplan.plan) & Q(pricing__period=30))[0]
-        print plan_pricing
         u.userplan.extend_account(plan_pricing.plan, plan_pricing.pricing)
         self.assertEqual(u.userplan.expire, date.today() + timedelta(days=plan_pricing.pricing.period))
         self.assertEqual(u.userplan.plan, plan_pricing.plan)
@@ -78,6 +101,17 @@ class PlansTestCase(TestCase):
         u.userplan.remind_expire_soon()
         self.assertEqual(u.userplan.active, True)
         self.assertEqual(len(mail.outbox), 1)
+
+    def test_disable_emails(self):
+        with self.settings(SEND_PLANS_EMAILS=False):
+            # Re-run the remind_expire test, but look for 0 emails sent
+            u = User.objects.get(username='test1')
+            u.userplan.expire = date.today() + timedelta(days=14)
+            u.userplan.active = True
+            u.userplan.save()
+            u.userplan.remind_expire_soon()
+            self.assertEqual(u.userplan.active, True)
+            self.assertEqual(len(mail.outbox), 0)
 
 
 class TestInvoice(TestCase):
@@ -110,30 +144,30 @@ class TestInvoice(TestCase):
         i.issued = date(2010, 5, 30)
         self.assertEqual(i.get_full_number(), "123/PF/05/2010")
 
-
     def test_get_full_number_with_settings(self):
-        settings.INVOICE_NUMBER_FORMAT = "{{ invoice.issued|date:'Y' }}.{{ invoice.number }}.{{ invoice.issued|date:'m' }}"
+        settings.PLANS_INVOICE_NUMBER_FORMAT = "{{ invoice.issued|date:'Y' }}." \
+                                         "{{ invoice.number }}.{{ invoice.issued|date:'m' }}"
         i = Invoice()
         i.number = 123
         i.issued = date(2010, 5, 30)
         self.assertEqual(i.get_full_number(), "2010.123.05")
 
     def test_set_issuer_invoice_data_raise(self):
-        issdata = settings.ISSUER_DATA
-        del settings.ISSUER_DATA
+        issdata = settings.PLANS_INVOICE_ISSUER
+        del settings.PLANS_INVOICE_ISSUER
         i = Invoice()
         self.assertRaises(ImproperlyConfigured, i.set_issuer_invoice_data)
-        settings.ISSUER_DATA = issdata
+        settings.PLANS_INVOICE_ISSUER = issdata
 
     def test_set_issuer_invoice_data(self):
         i = Invoice()
         i.set_issuer_invoice_data()
-        self.assertEqual(i.issuer_name, settings.ISSUER_DATA['issuer_name'])
-        self.assertEqual(i.issuer_street, settings.ISSUER_DATA['issuer_street'])
-        self.assertEqual(i.issuer_zipcode, settings.ISSUER_DATA['issuer_zipcode'])
-        self.assertEqual(i.issuer_city, settings.ISSUER_DATA['issuer_city'])
-        self.assertEqual(i.issuer_country, settings.ISSUER_DATA['issuer_country'])
-        self.assertEqual(i.issuer_tax_number, settings.ISSUER_DATA['issuer_tax_number'])
+        self.assertEqual(i.issuer_name, settings.PLANS_INVOICE_ISSUER['issuer_name'])
+        self.assertEqual(i.issuer_street, settings.PLANS_INVOICE_ISSUER['issuer_street'])
+        self.assertEqual(i.issuer_zipcode, settings.PLANS_INVOICE_ISSUER['issuer_zipcode'])
+        self.assertEqual(i.issuer_city, settings.PLANS_INVOICE_ISSUER['issuer_city'])
+        self.assertEqual(i.issuer_country, settings.PLANS_INVOICE_ISSUER['issuer_country'])
+        self.assertEqual(i.issuer_tax_number, settings.PLANS_INVOICE_ISSUER['issuer_tax_number'])
 
     def set_buyer_invoice_data(self):
         i = Invoice()
@@ -152,9 +186,11 @@ class TestInvoice(TestCase):
         self.assertEqual(i.buyer_country, u.billinginfo.shipping_country)
 
     def test_invoice_number(self):
-        settings.INVOICE_NUMBER_FORMAT = "{{ invoice.number }}/{% ifequal invoice.type invoice.INVOICE_TYPES.PROFORMA %}PF{% else %}FV{% endifequal %}/{{ invoice.issued|date:'m/Y' }}"
+        settings.PLANS_INVOICE_NUMBER_FORMAT = "{{ invoice.number }}/{% ifequal " \
+                                         "invoice.type invoice.INVOICE_TYPES.PROFORMA %}PF{% else %}FV" \
+                                         "{% endifequal %}/{{ invoice.issued|date:'m/Y' }}"
         o = Order.objects.all()[0]
-        day = date(2010, 05, 03)
+        day = date(2010, 5, 3)
         i = Invoice(issued=day, selling_date=day, payment_date=day)
         i.copy_from_order(o)
         i.set_issuer_invoice_data()
@@ -165,25 +201,32 @@ class TestInvoice(TestCase):
         self.assertEqual(i.number, 1)
         self.assertEqual(i.full_number, '1/FV/05/2010')
 
-
     def test_invoice_number_daily(self):
-        settings.INVOICE_NUMBER_FORMAT = "{{ invoice.number }}/{% ifequal invoice.type invoice.INVOICE_TYPES.PROFORMA %}PF{% else %}FV{% endifequal %}/{{ invoice.issued|date:'d/m/Y' }}"
-        settings.INVOICE_COUNTER_RESET = Invoice.NUMBERING.DAILY
+        settings.PLANS_INVOICE_NUMBER_FORMAT = "{{ invoice.number }}/{% ifequal " \
+                                         "invoice.type invoice.INVOICE_TYPES.PROFORMA %}PF{% else %}FV" \
+                                         "{% endifequal %}/{{ invoice.issued|date:'d/m/Y' }}"
+        settings.PLANS_INVOICE_COUNTER_RESET = Invoice.NUMBERING.DAILY
 
         user = User.objects.get(username='test1')
         plan_pricing = PlanPricing.objects.all()[0]
-        tax = getattr(settings, "TAX")
-        currency = getattr(settings, "CURRENCY")
-        o1 = Order(user=user, plan=plan_pricing.plan, pricing=plan_pricing.pricing, amount=plan_pricing.price, tax=tax, currency=currency)
+        tax = getattr(settings, "PLANS_TAX")
+        currency = getattr(settings, "PLANS_CURRENCY")
+        o1 = Order(user=user, plan=plan_pricing.plan,
+                   pricing=plan_pricing.pricing, amount=plan_pricing.price,
+                   tax=tax, currency=currency)
         o1.save()
 
-        o2 = Order(user=user, plan=plan_pricing.plan, pricing=plan_pricing.pricing, amount=plan_pricing.price, tax=tax, currency=currency)
+        o2 = Order(user=user, plan=plan_pricing.plan,
+                   pricing=plan_pricing.pricing, amount=plan_pricing.price,
+                   tax=tax, currency=currency)
         o2.save()
 
-        o3 = Order(user=user, plan=plan_pricing.plan, pricing=plan_pricing.pricing, amount=plan_pricing.price, tax=tax, currency=currency)
+        o3 = Order(user=user, plan=plan_pricing.plan,
+                   pricing=plan_pricing.pricing, amount=plan_pricing.price,
+                   tax=tax, currency=currency)
         o3.save()
 
-        day = date(2001, 05, 03)
+        day = date(2001, 5, 3)
         i1 = Invoice(issued=day, selling_date=day, payment_date=day)
         i1.copy_from_order(o1)
         i1.set_issuer_invoice_data()
@@ -198,7 +241,7 @@ class TestInvoice(TestCase):
         i2.clean()
         i2.save()
 
-        day = date(2001, 05, 04)
+        day = date(2001, 5, 4)
         i3 = Invoice(issued=day, selling_date=day, payment_date=day)
         i3.copy_from_order(o1)
         i3.set_issuer_invoice_data()
@@ -210,25 +253,32 @@ class TestInvoice(TestCase):
         self.assertEqual(i2.full_number, "2/FV/03/05/2001")
         self.assertEqual(i3.full_number, "1/FV/04/05/2001")
 
-
     def test_invoice_number_monthly(self):
-        settings.INVOICE_NUMBER_FORMAT = "{{ invoice.number }}/{% ifequal invoice.type invoice.INVOICE_TYPES.PROFORMA %}PF{% else %}FV{% endifequal %}/{{ invoice.issued|date:'m/Y' }}"
-        settings.INVOICE_COUNTER_RESET = Invoice.NUMBERING.MONTHLY
+        settings.PLANS_INVOICE_NUMBER_FORMAT = "{{ invoice.number }}/{% ifequal " \
+                                         "invoice.type invoice.INVOICE_TYPES.PROFORMA %}PF{% else %}FV" \
+                                         "{% endifequal %}/{{ invoice.issued|date:'m/Y' }}"
+        settings.PLANS_INVOICE_COUNTER_RESET = Invoice.NUMBERING.MONTHLY
 
         user = User.objects.get(username='test1')
         plan_pricing = PlanPricing.objects.all()[0]
-        tax = getattr(settings, "TAX")
-        currency = getattr(settings, "CURRENCY")
-        o1 = Order(user=user, plan=plan_pricing.plan, pricing=plan_pricing.pricing, amount=plan_pricing.price, tax=tax, currency=currency)
+        tax = getattr(settings, "PLANS_TAX")
+        currency = getattr(settings, "PLANS_CURRENCY")
+        o1 = Order(user=user, plan=plan_pricing.plan,
+                   pricing=plan_pricing.pricing, amount=plan_pricing.price,
+                   tax=tax, currency=currency)
         o1.save()
 
-        o2 = Order(user=user, plan=plan_pricing.plan, pricing=plan_pricing.pricing, amount=plan_pricing.price, tax=tax, currency=currency)
+        o2 = Order(user=user, plan=plan_pricing.plan,
+                   pricing=plan_pricing.pricing, amount=plan_pricing.price,
+                   tax=tax, currency=currency)
         o2.save()
 
-        o3 = Order(user=user, plan=plan_pricing.plan, pricing=plan_pricing.pricing, amount=plan_pricing.price, tax=tax, currency=currency)
+        o3 = Order(user=user, plan=plan_pricing.plan,
+                   pricing=plan_pricing.pricing, amount=plan_pricing.price,
+                   tax=tax, currency=currency)
         o3.save()
 
-        day = date(2002, 05, 03)
+        day = date(2002, 5, 3)
         i1 = Invoice(issued=day, selling_date=day, payment_date=day)
         i1.copy_from_order(o1)
         i1.set_issuer_invoice_data()
@@ -236,7 +286,7 @@ class TestInvoice(TestCase):
         i1.clean()
         i1.save()
 
-        day = date(2002, 05, 13)
+        day = date(2002, 5, 13)
         i2 = Invoice(issued=day, selling_date=day, payment_date=day)
         i2.copy_from_order(o2)
         i2.set_issuer_invoice_data()
@@ -244,7 +294,7 @@ class TestInvoice(TestCase):
         i2.clean()
         i2.save()
 
-        day = date(2002, 06, 01)
+        day = date(2002, 6, 1)
         i3 = Invoice(issued=day, selling_date=day, payment_date=day)
         i3.copy_from_order(o1)
         i3.set_issuer_invoice_data()
@@ -257,23 +307,31 @@ class TestInvoice(TestCase):
         self.assertEqual(i3.full_number, "1/FV/06/2002")
 
     def test_invoice_number_annually(self):
-        settings.INVOICE_NUMBER_FORMAT = "{{ invoice.number }}/{% ifequal invoice.type invoice.INVOICE_TYPES.PROFORMA %}PF{% else %}FV{% endifequal %}/{{ invoice.issued|date:'Y' }}"
-        settings.INVOICE_COUNTER_RESET = Invoice.NUMBERING.ANNUALLY
+        settings.PLANS_INVOICE_NUMBER_FORMAT = "{{ invoice.number }}/{% ifequal " \
+                                         "invoice.type invoice.INVOICE_TYPES.PROFORMA %}PF{% else %}FV" \
+                                         "{% endifequal %}/{{ invoice.issued|date:'Y' }}"
+        settings.PLANS_INVOICE_COUNTER_RESET = Invoice.NUMBERING.ANNUALLY
 
         user = User.objects.get(username='test1')
         plan_pricing = PlanPricing.objects.all()[0]
-        tax = getattr(settings, "TAX")
-        currency = getattr(settings, "CURRENCY")
-        o1 = Order(user=user, plan=plan_pricing.plan, pricing=plan_pricing.pricing, amount=plan_pricing.price, tax=tax, currency=currency)
+        tax = getattr(settings, "PLANS_TAX")
+        currency = getattr(settings, "PLANS_CURRENCY")
+        o1 = Order(user=user, plan=plan_pricing.plan,
+                   pricing=plan_pricing.pricing, amount=plan_pricing.price,
+                   tax=tax, currency=currency)
         o1.save()
 
-        o2 = Order(user=user, plan=plan_pricing.plan, pricing=plan_pricing.pricing, amount=plan_pricing.price, tax=tax, currency=currency)
+        o2 = Order(user=user, plan=plan_pricing.plan,
+                   pricing=plan_pricing.pricing, amount=plan_pricing.price,
+                   tax=tax, currency=currency)
         o2.save()
 
-        o3 = Order(user=user, plan=plan_pricing.plan, pricing=plan_pricing.pricing, amount=plan_pricing.price, tax=tax, currency=currency)
+        o3 = Order(user=user, plan=plan_pricing.plan,
+                   pricing=plan_pricing.pricing, amount=plan_pricing.price,
+                   tax=tax, currency=currency)
         o3.save()
 
-        day = date(1991, 05, 03)
+        day = date(1991, 5, 3)
         i1 = Invoice(issued=day, selling_date=day, payment_date=day)
         i1.copy_from_order(o1)
         i1.set_issuer_invoice_data()
@@ -281,7 +339,7 @@ class TestInvoice(TestCase):
         i1.clean()
         i1.save()
 
-        day = date(1991, 07, 13)
+        day = date(1991, 7, 13)
         i2 = Invoice(issued=day, selling_date=day, payment_date=day)
         i2.copy_from_order(o2)
         i2.set_issuer_invoice_data()
@@ -289,7 +347,7 @@ class TestInvoice(TestCase):
         i2.clean()
         i2.save()
 
-        day = date(1992, 06, 01)
+        day = date(1992, 6, 1)
         i3 = Invoice(issued=day, selling_date=day, payment_date=day)
         i3.copy_from_order(o1)
         i3.set_issuer_invoice_data()
@@ -300,7 +358,6 @@ class TestInvoice(TestCase):
         self.assertEqual(i1.full_number, "1/FV/1991")
         self.assertEqual(i2.full_number, "2/FV/1991")
         self.assertEqual(i3.full_number, "1/FV/1992")
-
 
     def test_set_order(self):
         o = Order.objects.all()[0]
@@ -318,9 +375,7 @@ class TestInvoice(TestCase):
         self.assertEqual(i.currency, o.currency)
 
 
-
 class OrderTestCase(TestCase):
-
     def test_amount_taxed_none(self):
         o = Order()
         o.amount = Decimal(123)
@@ -353,13 +408,13 @@ class PlanChangePolicyTestCase(TestCase):
     def test_get_change_price(self):
         p1 = Plan.objects.get(pk=3)
         p2 = Plan.objects.get(pk=4)
-        self.assertEqual(self.policy.get_change_price(p1, p2, 23), Decimal('8.97'))
+        self.assertEqual(self.policy.get_change_price(p1, p2, 23), Decimal('7.82'))
         self.assertEqual(self.policy.get_change_price(p2, p1, 23), None)
 
     def test_get_change_price1(self):
         p1 = Plan.objects.get(pk=3)
         p2 = Plan.objects.get(pk=4)
-        self.assertEqual(self.policy.get_change_price(p1, p2, 53), Decimal('20.67'))
+        self.assertEqual(self.policy.get_change_price(p1, p2, 53), Decimal('18.02'))
         self.assertEqual(self.policy.get_change_price(p2, p1, 53), None)
 
     def test_get_change_price2(self):
@@ -375,11 +430,10 @@ class StandardPlanChangePolicyTestCase(TestCase):
     def setUp(self):
         self.policy = StandardPlanChangePolicy()
 
-
     def test_get_change_price(self):
         p1 = Plan.objects.get(pk=3)
         p2 = Plan.objects.get(pk=4)
-        self.assertEqual(self.policy.get_change_price(p1, p2, 23), Decimal('9.87'))
+        self.assertEqual(self.policy.get_change_price(p1, p2, 23), Decimal('8.60'))
         self.assertEqual(self.policy.get_change_price(p2, p1, 23), None)
 
 
@@ -388,35 +442,68 @@ class EUTaxationPolicyTestCase(TestCase):
         self.policy = EUTaxationPolicy()
 
     def test_none(self):
-        with self.settings(TAX=Decimal('23.0'), TAX_COUNTRY='PL'):
+        with self.settings(PLANS_TAX=Decimal('23.0'), PLANS_TAX_COUNTRY='PL'):
             self.assertEqual(self.policy.get_tax_rate(None, None), Decimal('23.0'))
 
     def test_private_nonEU(self):
-        with self.settings(TAX=Decimal('23.0'), TAX_COUNTRY='PL'):
+        with self.settings(PLANS_TAX=Decimal('23.0'), PLANS_TAX_COUNTRY='PL'):
             self.assertEqual(self.policy.get_tax_rate(None, 'RU'), None)
 
     def test_private_EU_same(self):
-        with self.settings(TAX=Decimal('23.0'), TAX_COUNTRY='PL'):
+        with self.settings(PLANS_TAX=Decimal('23.0'), PLANS_TAX_COUNTRY='PL'):
             self.assertEqual(self.policy.get_tax_rate(None, 'PL'), Decimal('23.0'))
 
     def test_private_EU_notsame(self):
-        with self.settings(TAX=Decimal('23.0'), TAX_COUNTRY='PL'):
-            self.assertEqual(self.policy.get_tax_rate(None, 'AT'), Decimal('23.0'))
+        with self.settings(PLANS_TAX=Decimal('23.0'), PLANS_TAX_COUNTRY='PL'):
+            self.assertEqual(self.policy.get_tax_rate(None, 'AT'), Decimal('20.0'))
 
     def test_company_nonEU(self):
-        with self.settings(TAX=Decimal('23.0'), TAX_COUNTRY='PL'):
+        with self.settings(PLANS_TAX=Decimal('23.0'), PLANS_TAX_COUNTRY='PL'):
             self.assertEqual(self.policy.get_tax_rate('123456', 'RU'), None)
 
     def test_company_EU_same(self):
-        with self.settings(TAX=Decimal('23.0'), TAX_COUNTRY='PL'):
+        with self.settings(PLANS_TAX=Decimal('23.0'), PLANS_TAX_COUNTRY='PL'):
             self.assertEqual(self.policy.get_tax_rate('123456', 'PL'), Decimal('23.0'))
 
     @mock.patch("vatnumber.check_vies", lambda x: True)
     def test_company_EU_notsame_vies_ok(self):
-        with self.settings(TAX=Decimal('23.0'), TAX_COUNTRY='PL'):
+        with self.settings(PLANS_TAX=Decimal('23.0'), PLANS_TAX_COUNTRY='PL'):
             self.assertEqual(self.policy.get_tax_rate('123456', 'AT'), None)
 
     @mock.patch("vatnumber.check_vies", lambda x: False)
     def test_company_EU_notsame_vies_not_ok(self):
-        with self.settings(TAX=Decimal('23.0'), TAX_COUNTRY='PL'):
-            self.assertEqual(self.policy.get_tax_rate('123456', 'AT'), Decimal('23.0'))
+        with self.settings(PLANS_TAX=Decimal('23.0'), PLANS_TAX_COUNTRY='PL'):
+            self.assertEqual(self.policy.get_tax_rate('123456', 'AT'), Decimal('20.0'))
+
+
+class ValidatorsTestCase(TestCase):
+    def test_model_count_validator(self):
+        """
+        We create a test model validator for User. It will raise ValidationError when QUOTA_NAME value
+        will be lower than number of elements of model User.
+        """
+
+        class TestValidator(ModelCountValidator):
+            code = 'QUOTA_NAME'
+            model = User
+
+        validator_object = TestValidator()
+        self.assertRaises(ValidationError, validator_object, user=None, quota_dict={'QUOTA_NAME': 1})
+        self.assertEqual(validator_object(user=None, quota_dict={'QUOTA_NAME': 2}), None)
+        self.assertEqual(validator_object(user=None, quota_dict={'QUOTA_NAME': 3}), None)
+
+
+        #   TODO: FIX this test not to use Pricing for testing  ModelAttributeValidator
+        # def test_model_attribute_validator(self):
+        #     """
+        #     We create a test attribute validator which will validate if Pricing objects has a specific value set.
+        #     """
+        #
+        #     class TestValidator(ModelAttributeValidator):
+        #         code = 'QUOTA_NAME'
+        #         attribute = 'period'
+        #         model = Pricing
+        #
+        #     validator_object = TestValidator()
+        #     self.assertRaises(ValidationError, validator_object, user=None, quota_dict={'QUOTA_NAME': 360})
+        #     self.assertEqual(validator_object(user=None, quota_dict={'QUOTA_NAME': 365}), None)

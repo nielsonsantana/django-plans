@@ -1,0 +1,13 @@
+django==1.6.2
+django-bootstrap3
+Sphinx
+django-debug-toolbar
+django-extensions
+mock
+tox
+suds-jurko
+
+
+# Not supported in py3
+#fabric
+#transifex-client

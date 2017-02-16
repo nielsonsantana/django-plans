@@ -11,18 +11,18 @@ Taxation policy can be defined as a simple class that should inherit from ``plan
     :members:
     :undoc-members:
 
-Django-plans application is shipped with some default taxation policies. You can choose them via :ref:`settings-TAXATION_POLICY` variable.
+Django-plans application is shipped with some default taxation policies. You can choose them via :ref:`settings-PLANS_TAXATION_POLICY` variable.
 
 ``EUTaxationPolicy``
 --------------------
 
-.. autoclass:: plans.locale.eu.taxation.EUTaxationPolicy
+.. autoclass:: plans.taxation.eu.EUTaxationPolicy
 
 
 
 
 .. note::
-    This taxation policy requires ``suds`` and ``vatnumber`` python modules (connecting to `VIES <http://ec.europa.eu/taxation_customs/vies/>`_). If you want them automatically installed please remember to insert extra depedencies for pip::
+    This taxation policy requires ``suds`` (we use suds-jurko) and ``vatnumber`` python modules (connecting to `VIES <http://ec.europa.eu/taxation_customs/vies/>`_). If you want them automatically installed please remember to insert extra depedencies for pip::
 
         $ pip install django-plans[eu]
 
@@ -31,7 +31,7 @@ Django-plans application is shipped with some default taxation policies. You can
 
 FIXME: under developement
 
-.. autoclass:: plans.locale.ru.taxation.RussianTaxationPolicy
+.. autoclass:: plans.taxation.ru.RussianTaxationPolicy
     :members:
     :undoc-members:
 

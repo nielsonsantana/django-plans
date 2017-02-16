@@ -2,19 +2,6 @@
 {% load i18n %}
 
 {% block body %}
-
     <h2>{% trans "Choose plan" %}</h2>
-
     {% include "plans/plan_table.html" %}
-
-
-    <h2>{% trans "Need even more?" %}</h2>
-
-    <p>
-    {% blocktrans %}
-        Please <a href="mailto:">contact our sales</a> for an exclusive
-        customised offer tailored to your needs.
-    {% endblocktrans %}
-    </p>
-
 {% endblock %}

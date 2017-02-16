@@ -10,24 +10,26 @@ Assuming you have correctly installed django-plans in your app you only need to 
 
     INSTALLED_APPS += ('modeltranslation', 'plans_i18n')
 
-and you should also define your languages in django ``LANG`` variable, eg.::
+and you should also define your languages in django ``LANGUAGES`` variable, eg.::
 
     LANGUAGES = (
         ('pl', 'Polski'),
         ('en', 'English'),
         )
 
-Please note that adding those to ``INSTALLED_APPS`` **changes** django models. Concretely it adds for every registered ``field`` that should translated, additional fields with name ``field_<lang_code>``, e.g. for given model::
+Please note that adding those to ``INSTALLED_APPS`` **changes** django models. Concretely for every registered ``field`` that should be translated  it adds  number of fields using format ``field_<lang_code>``, e.g. for given model::
 
     class MyModel(models.Model):
         name = models.CharField(max_length=10)
 
-There will be generated fields: ``name`` , ``name_en``, ``name_pl``.
+Following fields will be present in MyModel: ``name`` , ``name_en``, ``name_pl``.
 
-You should migrate your database, using South is recommended::
+To apply those changes please migrate your database. E.g. using South you need to run following commands::
 
     $ python manage.py schemamigration --auto plans
     $ python migrate plans
+
+Please notice that you will use a custom migration for your project. It usually requires to configure ``SOUTH_MIGRATION_MODULES``.
 
 This app will also make all required adjustments in django admin.
 

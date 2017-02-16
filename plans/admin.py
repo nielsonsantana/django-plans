@@ -5,7 +5,7 @@ from django.core import urlresolvers
 from ordered_model.admin import OrderedModelAdmin
 from django.utils.translation import ugettext_lazy as _
 
-from models import UserPlan, Plan, PlanQuota, Quota, PlanPricing, Pricing, Order, BillingInfo
+from .models import UserPlan, Plan, PlanQuota, Quota, PlanPricing, Pricing, Order, BillingInfo
 from plans.models import Invoice
 
 
@@ -53,12 +53,12 @@ def copy_plan(modeladmin, request, queryset):
             quota.save(force_insert=True)
 
 
-copy_plan.short_description = _('Make plan copy')
+copy_plan.short_description = _('Make a plan copy')
 
 
 class PlanAdmin(OrderedModelAdmin):
     search_fields = ('name', 'customized__username', 'customized__email', )
-    list_filter = ( 'available',  )
+    list_filter = ('available', 'visible')
     list_display = ('name', 'description', 'customized', 'default', 'available', 'created', 'move_up_down_links')
     inlines = (PlanPricingInline, PlanQuotaInline)
     list_select_related = True
@@ -104,7 +104,7 @@ class OrderAdmin(admin.ModelAdmin):
     raw_id_fields = ('user',)
     search_fields = ('id', 'user__username', 'user__email','order_id')
     list_display = (
-    'id', 'name', 'created', 'user', 'status', 'completed', 'tax', 'amount', 'currency', 'plan', 'pricing','order_id')
+        'id', 'name', 'created', 'user', 'status', 'completed', 'tax', 'amount', 'currency', 'plan', 'pricing')
     actions = [make_order_completed, make_order_invoice]
     inlines = (InvoiceInline, )
 
@@ -116,14 +116,14 @@ class InvoiceAdmin(admin.ModelAdmin):
     search_fields = ('full_number', 'buyer_tax_number', 'user__username', 'user__email')
     list_filter = ('type', 'issued')
     list_display = (
-    'full_number', 'issued', 'total_net', 'currency', 'user', 'tax', 'buyer_name', 'buyer_city', 'buyer_tax_number')
+        'full_number', 'issued', 'total_net', 'currency', 'user', 'tax', 'buyer_name', 'buyer_city', 'buyer_tax_number')
     list_select_related = True
     raw_id_fields = ('user', 'order')
 
 
 class UserPlanAdmin(UserLinkMixin, admin.ModelAdmin):
-    list_filter = ('active', 'expire', 'plan__name')
-    search_fields = ('user__username', 'user__email', 'plan__name')
+    list_filter = ('active', 'expire', 'plan__name', 'plan__available', 'plan__visible',)
+    search_fields = ('user__username', 'user__email', 'plan__name',)
     list_display = ('user', 'plan', 'expire', 'active')
     list_select_related = True
     readonly_fields = ['user_link', ]
