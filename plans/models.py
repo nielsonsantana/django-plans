@@ -89,6 +89,12 @@ class Plan(OrderedModel):
             quota_dic[plan_quota.quota.codename] = plan_quota.value
         return quota_dic
 
+    def get_quota_by_name(self, quota_name):
+        try:
+            return self.planquota_set.filter(quota__codename=quota_name)[0]
+        except IndexError, e:
+            return None
+
 
 class BillingInfo(models.Model):
     """
