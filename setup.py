@@ -7,7 +7,7 @@ with open('README.rst') as file:
 
 setup(
     name='django-plans',
-    version='0.7alpha',
+    version='0.7.1alpha',
     description='Pluggable django app for managing pricing plans with quotas and accounts expiration',
     long_description=long_description,
     author='Krzysztof Dorosz',
