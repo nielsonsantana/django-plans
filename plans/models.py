@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 import re
 import logging
 import vatnumber
+import uuid
 
 from decimal import Decimal
 from datetime import date, timedelta, datetime
@@ -118,7 +119,7 @@ class Plan(OrderedModel):
     def get_quota_by_name(self, quota_name):
         try:
             return self.planquota_set.filter(quota__codename=quota_name)[0]
-        except IndexError, e:
+        except IndexError as e:
             return None
 
 
@@ -486,8 +487,7 @@ class Order(models.Model):
     order_id = models.CharField(max_length=40, null=True, blank=True, unique=True)
 
     def __init__(self, *args, **kwargs):
-        import uuid
-        super(Order, self).__init__(*args,**kwargs)
+        super(Order, self).__init__(*args, **kwargs)
         if not self.order_id:
             self.order_id = str(uuid.uuid4().hex[:-16])
 
