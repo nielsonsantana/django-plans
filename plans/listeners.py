@@ -1,8 +1,12 @@
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.db.models.signals import post_save
 from django.dispatch.dispatcher import receiver
 from plans.models import Order, Invoice, UserPlan, Plan
 from plans.signals import order_completed, activate_user_plan
+
+
+User = get_user_model()
+
 
 @receiver(post_save, sender=Order)
 def create_proforma_invoice(sender, instance, created, **kwargs):
@@ -32,9 +36,7 @@ def set_default_user_plan(sender, instance, created, **kwargs):
     """
 
     if created:
-        default_plan = Plan.get_default_plan()
-        if default_plan is not None:
-            UserPlan.objects.create(user=instance, plan=default_plan, active=False, expire=None)
+        UserPlan.create_for_user(instance)
 
 
 # Hook to django-registration to initialize plan automatically after user has confirm account

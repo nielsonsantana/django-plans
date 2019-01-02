@@ -217,6 +217,10 @@ Example::
         'MAX_STORAGE' :  'myproject.validators.max_storage_validator',
     }
 
+The dict itself could be also lazy imported string::
+
+    PLANS_VALIDATORS = 'myproject.validators.validator_dict'
+
 
 Further reading: :doc:`quota_validators`
 
@@ -275,7 +279,14 @@ Example::
 
     PLANS_TAX_COUNTRY = 'PL'
 
+``PLANS_APP_VERBOSE_NAME``
+--------------------------
 
+**Optional**
+
+Default: ``plans``
+
+The ``verbose_name`` of django-plans' ``AppConfig``.
 
 .. note::
 
