@@ -92,7 +92,7 @@ class Plan(OrderedModel):
     def get_quota_by_name(self, quota_name):
         try:
             return self.planquota_set.filter(quota__codename=quota_name)[0]
-        except IndexError, e:
+        except IndexError as e:
             return None
 
 
