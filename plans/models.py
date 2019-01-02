@@ -92,10 +92,8 @@ class Plan(OrderedModel):
 
         super(Plan, self).save(*args, **kwargs)
 
-
     def __unicode__(self):
         return u"%s" % (self.name)
-
 
     @classmethod
     def get_default_plan(cls):
@@ -108,7 +106,6 @@ class Plan(OrderedModel):
     def __str__(self):
         return self.name
 
-
     def get_quota_dict(self):
         quota_dic = {}
         for plan_quota in PlanQuota.objects.filter(plan=self).select_related('quota'):
@@ -118,7 +115,7 @@ class Plan(OrderedModel):
     def get_quota_by_name(self, quota_name):
         try:
             return self.planquota_set.filter(quota__codename=quota_name)[0]
-        except IndexError, e:
+        except IndexError as e:
             return None
 
 
@@ -369,7 +366,6 @@ class Pricing(models.Model):
         verbose_name = _("Pricing")
         verbose_name_plural = _("Pricings")
 
-
     def __str__(self):
         return "%s (%d " % (self.name, self.period) + "%s)" % _("days")
 
@@ -398,6 +394,7 @@ class Quota(OrderedModel):
 
 
 class PlanPricingManager(models.Manager):
+
     def get_queryset(self):
         return super(PlanPricingManager, self).get_queryset().select_related('plan', 'pricing')
 
@@ -420,6 +417,7 @@ class PlanPricing(models.Model):
 
 
 class PlanQuotaManager(models.Manager):
+
     def get_queryset(self):
         return super(PlanQuotaManager, self).get_queryset().select_related('plan', 'quota')
 
@@ -455,7 +453,8 @@ class Order(models.Model):
 
     ])
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name=_('user'), on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL,
+                             verbose_name=_('user'), on_delete=models.CASCADE)
     flat_name = models.CharField(max_length=200, blank=True, null=True)
     plan = models.ForeignKey('Plan', verbose_name=_(
         'plan'), related_name="plan_order", on_delete=models.CASCADE)
@@ -481,19 +480,19 @@ class Order(models.Model):
     tax = models.DecimalField(_('tax'), max_digits=4, decimal_places=2, db_index=True, null=True,
                               blank=True)  # Tax=None is when tax is not applicable
     currency = models.CharField(_('currency'), max_length=3, default='EUR')
-<<<<<<< HEAD
+<< << << < HEAD
     status = models.IntegerField(_('status'), choices=STATUS, default=STATUS.NEW)
     order_id = models.CharField(max_length=40, null=True, blank=True, unique=True)
 
     def __init__(self, *args, **kwargs):
         import uuid
-        super(Order, self).__init__(*args,**kwargs)
+        super(Order, self).__init__(*args, **kwargs)
         if not self.order_id:
             self.order_id = str(uuid.uuid4().hex[:-16])
-=======
+== == == =
     status = models.IntegerField(
         _('status'), choices=STATUS, default=STATUS.NEW)
->>>>>>> fae6bd227836e88ef49fc2ed13e068989ff4b551
+>>>>>> > fae6bd227836e88ef49fc2ed13e068989ff4b551
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         if self.created is None:
@@ -573,16 +572,19 @@ class Order(models.Model):
 
 
 class InvoiceManager(models.Manager):
+
     def get_queryset(self):
         return super(InvoiceManager, self).get_queryset().filter(type=Invoice.INVOICE_TYPES['INVOICE'])
 
 
 class InvoiceProformaManager(models.Manager):
+
     def get_queryset(self):
         return super(InvoiceProformaManager, self).get_queryset().filter(type=Invoice.INVOICE_TYPES['PROFORMA'])
 
 
 class InvoiceDuplicateManager(models.Manager):
+
     def get_queryset(self):
         return super(InvoiceDuplicateManager, self).get_queryset().filter(type=Invoice.INVOICE_TYPES['DUPLICATE'])
 
@@ -612,7 +614,8 @@ class Invoice(models.Model):
         MONTHLY = 2
         ANNUALLY = 3
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name=_('user'), on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL,
+                             verbose_name=_('user'), on_delete=models.CASCADE)
     order = models.ForeignKey('Order', verbose_name=_('order'), on_delete=models.CASCADE)
     number = models.IntegerField(db_index=True)
     full_number = models.CharField(max_length=200)
