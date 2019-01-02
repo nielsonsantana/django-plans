@@ -11,11 +11,12 @@ from django.db import models
 from django.db.models import Max
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 try:
     from django.contrib.sites.models import Site
 except RuntimeError:
     Site = None
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 
 from django.template import Context
 from django.template.base import Template
@@ -56,7 +57,12 @@ class Plan(OrderedModel):
     """
     name = models.CharField(_('name'), max_length=100)
     description = models.TextField(_('description'), blank=True)
-    default = models.BooleanField(default=False, db_index=True)
+    default = models.NullBooleanField(
+        help_text=_('Both "Unknown" and "No" means that the plan is not default'),
+        default=None,
+        db_index=True,
+        unique=True,
+    )
     available = models.BooleanField(
         _('available'), default=False, db_index=True,
         help_text=_('Is still available for purchase')
@@ -68,7 +74,8 @@ class Plan(OrderedModel):
     created = models.DateTimeField(_('created'), db_index=True)
     customized = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
-        verbose_name=_('customized')
+        verbose_name=_('customized'),
+        on_delete=models.CASCADE
     )
     quotas = models.ManyToManyField('Quota', through='PlanQuota')
     url = models.URLField(max_length=200, blank=True, help_text=_(
@@ -93,9 +100,10 @@ class Plan(OrderedModel):
     @classmethod
     def get_default_plan(cls):
         try:
-            return cls.objects.filter(default=True)[0]
-        except IndexError:
-            return None
+            return_value = cls.objects.get(default=True)
+        except cls.DoesNotExist:
+            return_value = None
+        return return_value
 
     def __str__(self):
         return self.name
@@ -119,7 +127,8 @@ class BillingInfo(models.Model):
     Stores customer billing data needed to issue an invoice
     """
     user = models.OneToOneField(
-        settings.AUTH_USER_MODEL, verbose_name=_('user')
+        settings.AUTH_USER_MODEL, verbose_name=_('user'),
+        on_delete=models.CASCADE
     )
     tax_number = models.CharField(
         _('VAT ID'), max_length=200, blank=True, db_index=True
@@ -176,8 +185,10 @@ class UserPlan(models.Model):
     Currently selected plan for user account.
     """
     user = models.OneToOneField(
-        settings.AUTH_USER_MODEL, verbose_name=_('user'))
-    plan = models.ForeignKey('Plan', verbose_name=_('plan'))
+        settings.AUTH_USER_MODEL, verbose_name=_('user'),
+        on_delete=models.CASCADE
+    )
+    plan = models.ForeignKey('Plan', verbose_name=_('plan'), on_delete=models.CASCADE)
     expire = models.DateField(
         _('expire'), default=None, blank=True, null=True, db_index=True)
     active = models.BooleanField(_('active'), default=True, db_index=True)
@@ -323,6 +334,24 @@ class UserPlan(models.Model):
         send_template_email([self.user.email], 'mail/remind_expire_title.txt', 'mail/remind_expire_body.txt',
                             mail_context, get_user_language(self.user))
 
+    @classmethod
+    def create_for_user(cls, user):
+        default_plan = Plan.get_default_plan()
+        if default_plan is not None:
+            return UserPlan.objects.create(
+                user=user,
+                plan=default_plan,
+                active=False,
+                expire=None,
+            )
+
+    @classmethod
+    def create_for_users_without_plan(cls):
+        userplans = get_user_model().objects.filter(userplan=None)
+        for user in userplans:
+            UserPlan.create_for_user(user)
+        return userplans
+
 
 @python_2_unicode_compatible
 class Pricing(models.Model):
@@ -375,8 +404,8 @@ class PlanPricingManager(models.Manager):
 
 @python_2_unicode_compatible
 class PlanPricing(models.Model):
-    plan = models.ForeignKey('Plan')
-    pricing = models.ForeignKey('Pricing')
+    plan = models.ForeignKey('Plan', on_delete=models.CASCADE)
+    pricing = models.ForeignKey('Pricing', on_delete=models.CASCADE)
     price = models.DecimalField(max_digits=7, decimal_places=2, db_index=True)
 
     objects = PlanPricingManager()
@@ -396,8 +425,8 @@ class PlanQuotaManager(models.Manager):
 
 
 class PlanQuota(models.Model):
-    plan = models.ForeignKey('Plan')
-    quota = models.ForeignKey('Quota')
+    plan = models.ForeignKey('Plan', on_delete=models.CASCADE)
+    quota = models.ForeignKey('Quota', on_delete=models.CASCADE)
     value = models.IntegerField(default=1, null=True, blank=True)
 
     objects = PlanQuotaManager()
@@ -426,15 +455,27 @@ class Order(models.Model):
 
     ])
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name=_('user'))
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name=_('user'), on_delete=models.CASCADE)
     flat_name = models.CharField(max_length=200, blank=True, null=True)
     plan = models.ForeignKey('Plan', verbose_name=_(
-        'plan'), related_name="plan_order")
+        'plan'), related_name="plan_order", on_delete=models.CASCADE)
     pricing = models.ForeignKey('Pricing', blank=True, null=True, verbose_name=_(
-        'pricing'))  # if pricing is None the order is upgrade plan, not buy new pricing
+        'pricing'), on_delete=models.CASCADE)  # if pricing is None the order is upgrade plan, not buy new pricing
     created = models.DateTimeField(_('created'), db_index=True)
     completed = models.DateTimeField(
         _('completed'), null=True, blank=True, db_index=True)
+    plan_extended_from = models.DateField(
+        _('plan extended from'),
+        help_text=_('The plan was extended from this date'),
+        null=True,
+        blank=True,
+    )
+    plan_extended_until = models.DateField(
+        _('plan extended until'),
+        help_text=('The plan was extended until this date'),
+        null=True,
+        blank=True,
+    )
     amount = models.DecimalField(
         _('amount'), max_digits=7, decimal_places=2, db_index=True)
     tax = models.DecimalField(_('tax'), max_digits=4, decimal_places=2, db_index=True, null=True,
@@ -484,7 +525,12 @@ class Order(models.Model):
 
     def complete_order(self):
         if self.completed is None:
+            if self.user.userplan.expire and self.user.userplan.expire > date.today():
+                self.plan_extended_from = self.user.userplan.expire
+            else:
+                self.plan_extended_from = date.today()
             status = self.user.userplan.extend_account(self.plan, self.pricing)
+            self.plan_extended_until = self.user.userplan.expire
             self.completed = now()
             if status:
                 self.status = Order.STATUS.COMPLETED
@@ -566,8 +612,8 @@ class Invoice(models.Model):
         MONTHLY = 2
         ANNUALLY = 3
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name=_('user'))
-    order = models.ForeignKey('Order', verbose_name=_('order'))
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name=_('user'), on_delete=models.CASCADE)
+    order = models.ForeignKey('Order', verbose_name=_('order'), on_delete=models.CASCADE)
     number = models.IntegerField(db_index=True)
     full_number = models.CharField(max_length=200)
     type = models.IntegerField(

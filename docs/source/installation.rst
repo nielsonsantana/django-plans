@@ -8,7 +8,7 @@ You can install app using package manager directly from github:
 
 .. code-block:: bash
 
-    $ pip install -e git://github.com/cypreess/django-plans.git#egg=django-plans
+    $ pip install django-plans
 
 
 For integration instruction please see section  :doc:`integration`.
@@ -45,6 +45,16 @@ Initialize example project database:
 
 
 Initial example data will be loaded automatically.
+
+
+Create `UserPlan` objects for all `User` objects:
+This is done automatically during migrations, but any UserPlan is missing for whatever reason,
+you can create it by management command.
+
+.. code-block:: bash
+
+    $ cd ..
+    $ python manage.py create_userplans
 
 
 Start development web server:

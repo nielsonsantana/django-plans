@@ -1,4 +1,6 @@
 {% load i18n %}
+
+{% block 'table' %}
 <table class="table">
     <thead>
     <th>{% trans "Name" %}</th>
@@ -6,6 +8,11 @@
     <th>{% trans "VAT" %}</th>
     <th>{% trans "VAT total" %}</th>
     <th>{% trans "Total" %}</th>
+    <th>{% trans "Order completed" %}</th>
+    {% if order.user %}
+    <th>{% trans "Plan valid from" %}</th>
+    <th>{% trans "Plan valid until" %}</th>
+    {% endif %}
     </thead>
     <tbody>
     <td>{{ order.name }}</td>
@@ -13,8 +20,14 @@
     <td>{% ifequal order.tax None %}n/a{% else %}{{ order.tax }} %{% endifequal %}</td>
     <td>{% ifequal order.tax_total None %}n/a{% else %}{{ order.tax_total }} {{ order.currency }}{% endifequal %}</td>
     <td class="number total">{{ order.total }} {{ order.currency }}</td>
+    <td class="date">{{ order.completed|date|default:"-" }}</td>
+    {% if order.user %}
+    <td class="date">{{ order.plan_extended_from|date|default:"-" }}</td>
+    <td class="date">{{ order.plan_extended_until|date|default:"-" }}</td>
+    {% endif %}
     </tbody>
 </table>
+{% endblock %}
 
 {% ifequal order.tax None %}
     <h2>{% trans "EU VAT" %}</h2>
