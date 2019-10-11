@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.test import TestCase
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.core import mail
 from django.db.models import Q
@@ -16,11 +16,14 @@ if six.PY2:
 elif six.PY3:
     from unittest import mock
 
-from plans.models import PlanPricing, Invoice, Order, Plan
+from plans.models import PlanPricing, Invoice, Order, Plan, PlanQuota
 from plans.plan_change import PlanChangePolicy, StandardPlanChangePolicy
 from plans.taxation.eu import EUTaxationPolicy
 from plans.quota import get_user_quota
 from plans.validators import ModelCountValidator
+
+
+User = get_user_model()
 
 
 class PlansTestCase(TestCase):
@@ -477,6 +480,8 @@ class EUTaxationPolicyTestCase(TestCase):
 
 
 class ValidatorsTestCase(TestCase):
+    fixtures = ['test_django-plans_auth']
+
     def test_model_count_validator(self):
         """
         We create a test model validator for User. It will raise ValidationError when QUOTA_NAME value

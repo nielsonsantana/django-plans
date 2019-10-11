@@ -1,14 +1,17 @@
 language: python
 python:
-  - "2.7"
-  - "3.3"
+  - "3.6"
 env:
-  - DJANGO_VERSION=1.6
+  - DJANGO_VERSION=2.0.2
 # command to install dependencies
 install:
   - "pip install -q -e ."
   - "pip install -q -r demo/requirements.txt"
   - "pip install -q Django==$DJANGO_VERSION"
+  - "pip install codecov"
 
 # command to run tests
-script: "cd demo && python manage.py test plans"
+script: "cd demo && python manage.py makemigrations && coverage run manage.py test plans"
+
+after_success:
+  - codecov
