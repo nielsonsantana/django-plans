@@ -3,9 +3,13 @@ import logging
 from celery.schedules import crontab
 from celery.task.base import periodic_task
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.apps import apps
+
+
+User = apps.get_model(settings.AUTH_USER_MODEL)
 
 logger = logging.getLogger('plans.tasks')
+
 
 @periodic_task(run_every=crontab(hour=0, minute=5))
 def expire_account():

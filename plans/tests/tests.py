@@ -4,11 +4,14 @@ from datetime import timedelta
 
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.test import TestCase
-from django.contrib.auth.models import User
 from django.conf import settings
 from django.core import mail
 from django.db.models import Q
 from django.utils import six
+from django.conf import settings
+from django.apps import apps
+
+
 
 
 if six.PY2:
@@ -21,6 +24,9 @@ from plans.plan_change import PlanChangePolicy, StandardPlanChangePolicy
 from plans.taxation.eu import EUTaxationPolicy
 from plans.quota import get_user_quota
 from plans.validators import ModelCountValidator
+
+
+User = apps.get_model(settings.AUTH_USER_MODEL)
 
 
 class PlansTestCase(TestCase):
