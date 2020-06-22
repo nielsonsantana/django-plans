@@ -1,12 +1,9 @@
-from django.apps import apps
-from django.conf import settings
 from django.db.models.signals import post_save
 from django.dispatch.dispatcher import receiver
 from plans.models import Order, Invoice, UserPlan, Plan
 from plans.signals import order_completed, activate_user_plan
 
-
-User = apps.get_model(settings.AUTH_USER_MODEL)
+from accounts.models import User
 
 
 @receiver(post_save, sender=Order)
